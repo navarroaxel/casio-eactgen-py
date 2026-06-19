@@ -65,9 +65,18 @@ Cells (contiguous after directory + `00 00 00 00`):
 
 ## Markup → bytes
 
+All 12 EactMaker constructs are implemented and verified byte-identical:
+
 - `\frac{a}{b}` → `bb 1d 1a a 1b 1a b 1b 1e`
 - `\sqrt{x}`    → `86 1d 1a x 1b 1e`
+- `\abs{x}`     → `97 1d 1a x 1b 1e`
 - `\int{A}{B}{C}` → `8d 1a C 1c B 1c A 1b`  (integrand C first)
+- `\log{a}{b}` → `7f85 1a a 1c b 1b`
+- `\diff{a}{b}` → `7f26 …`; `\diff2{a}{b}` → `7f27 …`  (form `op 1a a 1c b 1b`)
+- `\sum{n}{k}{s}{e}` → `7f29 1a e 1c k 1c s 1c n 1b`  (expr, var, start, count)
+- `\mat{a&b}{c&d}` → `7f5d a4 (a4 cell 1c cell b4)… b4`
+- `\note{title}{body}` → **type 0x06 cell** = nested `@RUNMAT`/`TEXT1` sub-container;
+  see `build_note_content()` (note title and body are themselves `encode()`d).
 - `^x` / `^{...}` → `a8 1a x 1b` (power)
 - `_d` (digit)   → `e5 (d0+d)`;  `_L` (letter) → `e7 |ord(L)` (Mini Latin)
 - `∇` → `e6da`, `+` → `89`, `\bolde;` → `e5b0` (ℇ), `·`→`e5a7`, `∂`→`e6b9`, `⇒`→`13`
@@ -76,6 +85,12 @@ Cells (contiguous after directory + `00 00 00 00`):
 - Vulgar fractions (`½` …) expand to stacked fractions; subscripts/superscripts recurse
 
 `EACT_OVERRIDE` (in code) holds the chars EactMaker encodes differently from the table.
+The full feature set (and the per-construct `\xxx` insert templates) comes from the
+site's own config: `formats/g2e.js` (`GuiConfig.ButtonsBottom` + `CharsTables`).
+
+These were reverse-engineered by probing the live server with synthetic inputs and
+diffing the output (`POST` to `system/converter.php` with `titre`/`format`/`font`/`texte`).
+Validation: **9/9** files in `input.txt` regenerate byte-identical; container round-trip 11/11.
 
 ## Conventions
 
@@ -87,7 +102,8 @@ Cells (contiguous after directory + `00 00 00 00`):
 
 ## Known limitations / next steps
 
-- `\note{title}{body}` (type `0x06`) is a nested eActivity container — unimplemented.
-  Decode `examples/P.g2e`'s 0x06 cells to reverse it.
+- An **empty note body** (`\note{T}{}`) is degenerate in EactMaker (no 0x06 cell). Avoid it.
+- The Cyrillic char table (in `g2e.js`) isn't specially handled, but those chars resolve
+  through `chars.toml` like any other.
 - CILIND.g2e / TDCF.g2e have no matching lines in `input.txt`, so they can't be regenerated
-  from it (not a bug).
+  from it (not a bug — just absent source).

@@ -148,6 +148,37 @@ LATEX = {
 SUPERS = {"²": "2", "³": "3", "¹": "1", "⁰": "0", "⁴": "4", "⁵": "5",
           "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9", "ⁿ": "n"}
 
+# --- \note: a note is a nested @RUNMAT/TEXT1 sub-container (type 0x06 cell). -------
+# Constant template pieces, captured from real EactMaker output (note TT/BB).
+_NOTE_PREFIX16 = b"\x40\x45\x41\x43\x54" + bytes(8) + b"\x0a\x00\x00"   # "@EACT" + … + 0a (16 B)
+_NOTE_NESTED_HEADER = bytes.fromhex(            # mark+8 .. @RUNMAT (68 bytes, constant)
+    "0000003800010200020002000000000000001c2a"
+    "3f02c00000002830000000000101020101010301010101010101010101010100"
+    "00000000000000000000000000000000")
+_NOTE_RUNMAT = bytes.fromhex("405255 4e4d415400".replace(" ", "")) + bytes.fromhex("00000001")
+_NOTE_TEXT1  = bytes.fromhex("5445585431000000") + bytes.fromhex("00000014")
+_NOTE_ITEM   = bytes.fromhex("d4000003" "00000001" "8100000c" "00000000")
+
+def _pad4(n): return (4 - n % 4) % 4
+
+def build_note_content(title_bytes, body_bytes):
+    """Build the content of a \\note cell (type 0x06). build_eact() pads it."""
+    tr = title_bytes + b"\x00"
+    tr += b"\x00" * _pad4(len(tr))
+    body_cell_len = len(body_bytes) + 1 + _pad4(len(body_bytes) + 1)
+    rm = 0x20 + body_cell_len
+    tx = rm - 0x14
+    content = (_NOTE_PREFIX16 + tr + b"\xab\xcd\xef\x89" + b"\x00\x00\x00\x00"
+               + _NOTE_NESTED_HEADER
+               + _NOTE_RUNMAT + rm.to_bytes(4, "big")
+               + _NOTE_TEXT1 + tx.to_bytes(4, "big")
+               + _NOTE_ITEM + body_bytes)
+    plen = len(content) + 1
+    plen += _pad4(plen) + 4                       # build_eact's note pad rule
+    mark = 16 + len(tr)
+    outsz = plen - (mark + 8)
+    return content[:mark + 4] + outsz.to_bytes(4, "big") + content[mark + 8:]
+
 def _read_group(text, i):
     """text[i] must be '{'; return (inner, index_after_closing_brace), brace-balanced."""
     assert text[i] == "{"
@@ -239,6 +270,56 @@ def _encode_run(text, enc, literal_super):
             out += _encode_run(b, enc, literal_super) + [0x1C]
             out += _encode_run(a, enc, literal_super) + [GROUP_CLOSE]
             continue
+        if text.startswith(r"\abs{", i):
+            body, i = _read_group(text, i + 4)
+            out += [0x97, 0x1D, GROUP_OPEN] + _encode_run(body, enc, literal_super) + [GROUP_CLOSE, 0x1E]
+            continue
+        if text.startswith(r"\log{", i):
+            a, j = _read_group(text, i + 4)
+            b, i = _read_group(text, j)
+            out += [0x7F, 0x85, GROUP_OPEN] + _encode_run(a, enc, literal_super)
+            out += [0x1C] + _encode_run(b, enc, literal_super) + [GROUP_CLOSE]
+            continue
+        if text.startswith(r"\diff2{", i):
+            a, j = _read_group(text, i + 6)
+            b, i = _read_group(text, j)
+            out += [0x7F, 0x27, GROUP_OPEN] + _encode_run(a, enc, literal_super)
+            out += [0x1C] + _encode_run(b, enc, literal_super) + [GROUP_CLOSE]
+            continue
+        if text.startswith(r"\diff{", i):
+            a, j = _read_group(text, i + 5)
+            b, i = _read_group(text, j)
+            out += [0x7F, 0x26, GROUP_OPEN] + _encode_run(a, enc, literal_super)
+            out += [0x1C] + _encode_run(b, enc, literal_super) + [GROUP_CLOSE]
+            continue
+        if text.startswith(r"\sum{", i):
+            count, j = _read_group(text, i + 4)
+            var, j = _read_group(text, j)
+            start, j = _read_group(text, j)
+            expr, i = _read_group(text, j)
+            # 7f29 1a <expr> 1c <var> 1c <start> 1c <count> 1b
+            out += [0x7F, 0x29, GROUP_OPEN] + _encode_run(expr, enc, literal_super)
+            out += [0x1C] + _encode_run(var, enc, literal_super)
+            out += [0x1C] + _encode_run(start, enc, literal_super)
+            out += [0x1C] + _encode_run(count, enc, literal_super) + [GROUP_CLOSE]
+            continue
+        if text.startswith(r"\mat{", i):
+            rows = []
+            j = i + 4
+            while j < len(text) and text[j] == "{":
+                r, j = _read_group(text, j)
+                rows.append(r)
+            i = j
+            out += [0x7F, 0x5D, 0xA4]
+            for r in rows:
+                out += [0xA4]
+                for ci, cell in enumerate(r.split("&")):
+                    if ci:
+                        out += [0x1C]
+                    out += _encode_run(cell, enc, literal_super)
+                out += [0xB4]
+            out += [0xB4]
+            continue
         ch = text[i]
         if ch == "^":
             if text[i + 1:i + 2] == "{":
@@ -264,6 +345,19 @@ def encode(text, enc, literal_super=False):
     for k, v in sorted(LATEX.items(), key=lambda kv: -len(kv[0])):
         text = text.replace(k, v)
     return bytes(_encode_run(text, enc, literal_super))
+
+def encode_line(line, enc, literal_super=False):
+    """Encode one eActivity line. Returns (cell_bytes, is_note). A line of the form
+    \\note{title}{body} becomes a note (type 0x06) sub-container; otherwise a normal line."""
+    if line.startswith(r"\note{"):
+        title, j = _read_group(line, 5)
+        body, _ = _read_group(line, j)
+        if body == "":
+            print(f"warning: \\note{{{title}}}{{}} has an empty body — EactMaker "
+                  f"produces no note for this; give it some content.", file=sys.stderr)
+        return build_note_content(encode(title, enc, literal_super),
+                                  encode(body, enc, literal_super)), True
+    return encode(line, enc, literal_super), False
 
 # ---------------------------------------------------------------------------
 # Decoding: CASIO bytes -> Unicode
@@ -493,8 +587,8 @@ def main():
         if len(args.title) > 8:
             print("WARNING: title truncated to 8 chars", file=sys.stderr)
         lines = open(args.textfile, encoding="utf-8").read().splitlines()
-        enc_lines = [encode(ln, enc, args.literal_super) for ln in lines]
-        out = build_eact(args.title[:8], enc_lines)
+        pairs = [encode_line(ln, enc, args.literal_super) for ln in lines]
+        out = build_eact(args.title[:8], [p[0] for p in pairs], [p[1] for p in pairs])
         open(args.out, "wb").write(out)
         print(f"built {args.out}: {len(lines)} lines, size=0x{len(out):x} ({len(out)} bytes)")
         sig, oksz, okcmp, okctrl = header_report(out)

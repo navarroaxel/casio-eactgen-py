@@ -74,19 +74,25 @@ python3 casio_translate.py inspect FILE.g2e             # header check + decoded
 | `\frac{a}{b}` | stacked fraction |
 | `½ ⅓ ¼ …` | stacked fraction (vulgar-fraction glyphs) |
 | `\sqrt{x}` | square root |
+| `\abs{x}` | absolute value / modulus |
 | `\int{lo}{hi}{f}` | integral (any arg may be empty: `\int{}{x=V}{f}`) |
+| `\log{a}{b}` | log base *a* of *b* |
+| `\sum{n}{k}{0}{a}` | sum (count, variable, start, expression) |
+| `\mat{a&b}{c&d}` | matrix (rows in `{}`, cells split by `&`) |
+| `\diff{a}{b}` / `\diff2{a}{b}` | 1st / 2nd derivative of *a* in *b* |
+| `\note{title}{body}` | note / memo strip (own line) |
 | `^2`, `^{n+1}` | superscript / power |
 | `_v`, `_{12}` | subscript (letters and digits) |
 | `²` `³` | superscript glyphs |
 | `∇ ∂ · ⇒ ε μ π σ ρ θ Ω …` | typed directly as Unicode |
 | `\nabla \partial \epsilon \pi \sigma …` | LaTeX names, if easier to type |
 
-Plain ASCII passes through unchanged.
+Plain ASCII passes through unchanged. This matches EactMaker's markup exactly — every
+sample file regenerates byte-for-byte.
 
 ## Limitations
 
-- `\note{title}{body}` (the calculator's memo strip) is **not yet supported** — it's a
-  nested eActivity sub-container.
+- An empty note body (`\note{T}{}`) is degenerate in EactMaker — give notes a body.
 - Verified on the fx-9860G family `.g2e`/`.g1e`. fx-CG (Prizm) `.g3e` is *not* targeted.
 
 ## How it works
