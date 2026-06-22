@@ -1,6 +1,7 @@
 # eactgen — CASIO eActivity generator
 
-Generate CASIO **eActivity** files (`.g2e` / `.g1e`) for fx-9860G–series graphing
+Generate CASIO **eActivity** files (`.g2e` / `.g1e` / `.g3e`) for fx-9860G–series and
+fx-CG (Prizm) graphing
 calculators directly on your computer — write your formulas in plain text with a small
 LaTeX-like markup and get a file you can transfer to the calculator.
 
@@ -91,7 +92,9 @@ sample file regenerates byte-for-byte.
 ## Limitations
 
 - An empty note body (`\note{T}{}`) is degenerate in EactMaker — give notes a body.
-- Verified on the fx-9860G family `.g2e`/`.g1e`. fx-CG (Prizm) `.g3e` is *not* targeted.
+- Verified byte-for-byte against EactMaker for `.g2e`/`.g1e` (fx-9860G family) and `.g3e`
+  (fx-CG / Prizm). `.g3e` differs from `.g2e` only by a fixed prefix subtype block
+  (`_FMT_OVERRIDES`); select it with `--format g3e` or a `.g3e` output extension.
 
 ## How it works
 

@@ -6,7 +6,7 @@ Instructions for AI agents working in this repo.
 
 A local recreation of **EactMaker** (`tools.planet-casio.com/EactMaker/`, a server-side
 tool whose source isn't public). It converts Unicode text + LaTeX-ish markup into
-CASIO **eActivity** files (`.g2e` / `.g1e`) for graphing calculators, doing both the
+CASIO **eActivity** files (`.g2e` / `.g1e` / `.g3e`) for graphing calculators, doing both the
 character encoding (Unicode → CASIO FONTCHARACTER) and the binary container.
 
 The whole implementation is one file: **`casio_translate.py`** (stdlib only, Python 3).
@@ -17,6 +17,12 @@ The user's calculator is an **fx-9860GIII**, which opens **both `.g1e` and `.g2e
 two containers are byte-structurally identical (verified); only the extension differs
 (`.g2e` = native GII/GIII format, `.g1e` = older fx-9860G). Default to `.g2e`. The
 extension is **not** why a file fails to load — that's always the contents.
+
+`.g3e` (fx-CG / Prizm) is also supported via `build --format g3e`. It is the `.g2e`
+container with a fixed prefix subtype block changed (`_FMT_OVERRIDES`), reverse-engineered
+byte-for-byte from the live server — *not* the large fx-CG subheader the old TASK.md
+predicted. (The live server's real `.g1e` also uses a distinct subtype block, but we keep
+`.g1e` == `.g2e` bytes by design; see `_FMT_OVERRIDES`.)
 
 ## Ground truth / how to validate
 

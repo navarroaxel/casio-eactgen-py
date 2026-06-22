@@ -467,10 +467,27 @@ _EACT_PREFIX = bytes.fromhex(
     "0000000000000000"                   # 0x60
 )
 
-def build_eact(title, lines_bytes, note_flags=None):
+# Per-format byte overrides on _EACT_PREFIX. EactMaker chooses the container by the
+# `format` POST field; the only thing that differs from the .g2e baseline is a fixed
+# subtype block at 0x28..0x37 (verified byte-for-byte against live-server probes —
+# size/content independent). fix_header() never touches these offsets.
+#   g2e is the baseline (no overrides).
+#   g3e (fx-CG / Prizm) differs only in these bytes; the rest of the container,
+#       checksums and offsets are identical to g2e.
+#   g1e: the live server emits a distinct subtype block (0x2a..0x2f = "Pack"), but
+#       this project has always treated .g1e as the .g2e bytes with a .g1e extension
+#       (verified to load on the fx-9860GIII). Kept as the g2e baseline for back-compat.
+_FMT_OVERRIDES = {
+    "g2e": {},
+    "g1e": {},
+    "g3e": {0x2A: 0x04, 0x2C: 0x01, 0x2D: 0x04, 0x2F: 0x00, 0x34: 0x2C},
+}
+
+def build_eact(title, lines_bytes, note_flags=None, fmt="g2e"):
     """
-    Build an eActivity (.g1e/.g2e) the way EactMaker does — verified to reproduce
-    examples/*.g2e byte-for-byte. Layout:
+    Build an eActivity (.g1e/.g2e/.g3e) the way EactMaker does — verified to reproduce
+    examples/*.g2e byte-for-byte. `fmt` selects the container subtype (see
+    _FMT_OVERRIDES); only a fixed prefix block differs between formats. Layout:
 
         0x00..0x67  fixed prefix (_EACT_PREFIX); size/checksum set by fix_header()
         0x68..0x77  '@EACT'  entry: name8 + 00000001 + u32(filesize-0x78)
@@ -520,6 +537,8 @@ def build_eact(title, lines_bytes, note_flags=None):
     body += content
 
     out = bytearray(_EACT_PREFIX + body)
+    for off, val in _FMT_OVERRIDES.get(fmt, {}).items():
+        out[off] = val
     size = len(out)
     out[0x74:0x78] = (size - 0x78).to_bytes(4, "big")
     out[0x84:0x88] = (size - 0x8C).to_bytes(4, "big")
@@ -565,11 +584,13 @@ def main():
     pp.add_argument("--literal-super", action="store_true")
     pp.add_argument("-o", "--out", required=True)
 
-    pb = sub.add_parser("build", help="build a .g1e/.g2e from a UTF-8 text file (one line per eActivity line)")
+    pb = sub.add_parser("build", help="build a .g1e/.g2e/.g3e from a UTF-8 text file (one line per eActivity line)")
     pb.add_argument("textfile", help="UTF-8 file; each line becomes an eActivity line")
     pb.add_argument("--template", default="TDCF.G1E", help="real .g1e/.g2e to copy the fixed header from")
     pb.add_argument("--title", required=True, help="eActivity title (<=8 chars)")
     pb.add_argument("--literal-super", action="store_true")
+    pb.add_argument("--format", choices=["g1e", "g2e", "g3e"],
+                    help="container format (default: inferred from -o extension, else g2e)")
     pb.add_argument("-o", "--out", required=True)
 
     ps = sub.add_parser("selftest", help="decode->encode round-trip on sample files")
@@ -631,7 +652,9 @@ def main():
             print("WARNING: title truncated to 8 chars", file=sys.stderr)
         lines = open(args.textfile, encoding="utf-8").read().splitlines()
         pairs = [encode_line(ln, enc, args.literal_super) for ln in lines]
-        out = build_eact(args.title[:8], [p[0] for p in pairs], [p[1] for p in pairs])
+        ext = os.path.splitext(args.out)[1].lower().lstrip(".")
+        fmt = args.format or (ext if ext in _FMT_OVERRIDES else "g2e")
+        out = build_eact(args.title[:8], [p[0] for p in pairs], [p[1] for p in pairs], fmt=fmt)
         open(args.out, "wb").write(out)
         print(f"built {args.out}: {len(lines)} lines, size=0x{len(out):x} ({len(out)} bytes)")
         sig, oksz, okcmp, okctrl = header_report(out)
