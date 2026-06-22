@@ -1,7 +1,5 @@
 # eactgen — generador de eActivity para CASIO
 
-*[English version](README.md)*
-
 Genera archivos **eActivity** de CASIO (`.g2e` / `.g1e`) para las calculadoras gráficas
 de la serie fx-9860G directamente en tu computadora: escribe tus fórmulas en texto plano
 con un pequeño marcado tipo LaTeX y obtén un archivo listo para pasar a la calculadora.
@@ -76,19 +74,25 @@ python3 casio_translate.py inspect FILE.g2e             # verifica encabezado + 
 | `\frac{a}{b}` | fracción apilada |
 | `½ ⅓ ¼ …` | fracción apilada (glifos de fracción) |
 | `\sqrt{x}` | raíz cuadrada |
+| `\abs{x}` | valor absoluto / módulo |
 | `\int{inf}{sup}{f}` | integral (cualquier argumento puede ir vacío: `\int{}{x=V}{f}`) |
+| `\log{a}{b}` | logaritmo en base *a* de *b* |
+| `\sum{n}{k}{0}{a}` | sumatoria (cantidad, variable, inicio, expresión) |
+| `\mat{a&b}{c&d}` | matriz (filas en `{}`, celdas separadas por `&`) |
+| `\diff{a}{b}` / `\diff2{a}{b}` | derivada 1ª / 2ª de *a* respecto de *b* |
+| `\note{título}{cuerpo}` | nota / recuadro (en su propia línea) |
 | `^2`, `^{n+1}` | superíndice / potencia |
 | `_v`, `_{12}` | subíndice (letras y dígitos) |
 | `²` `³` | glifos de superíndice |
 | `∇ ∂ · ⇒ ε μ π σ ρ θ Ω …` | se escriben directamente como Unicode |
 | `\nabla \partial \epsilon \pi \sigma …` | nombres LaTeX, si son más cómodos de teclear |
 
-El ASCII normal pasa sin cambios.
+El ASCII normal pasa sin cambios. Coincide exactamente con el marcado de EactMaker: cada
+archivo de ejemplo se regenera byte por byte.
 
 ## Limitaciones
 
-- `\note{título}{cuerpo}` (la nota/recuadro de la calculadora) **aún no está soportado**:
-  es un subcontenedor eActivity anidado.
+- Una nota con cuerpo vacío (`\note{T}{}`) es degenerada en EactMaker: dale cuerpo a las notas.
 - Verificado en `.g2e`/`.g1e` de la familia fx-9860G. El formato `.g3e` de la fx-CG
   (Prizm) *no* está contemplado.
 
