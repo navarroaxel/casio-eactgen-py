@@ -199,14 +199,55 @@ EACT_OVERRIDE = {
     "ℇ": 0xE5B0,   # Euler constant (\bolde;)
 }
 
+# CASIO glyphs with no single-codepoint Unicode form (so build_maps() can't put
+# them in `enc`): multi-codepoint Unicode sequences (base letter + combining mark,
+# or ⁻¹) and `\token;` markup for glyphs with no Unicode at all. Each maps straight
+# to its FONTCHARACTER code (chars.toml). Matched longest-first in _encode_run so
+# "\subs0;" wins over a bare "\".
+RAW_SEQ = [
+    ("\\subs0;", 0xE5CD),   # small subscript 0 (no Unicode form)
+    ("\\subs1;", 0xE5CE),   # small subscript 1
+    ("\\subs2;", 0xE5CF),   # small subscript 2
+    ("\\supr3;", 0xE5DF),   # special superscript 3 (no Unicode form)
+    ("\\s10;", 0xB5),       # small "10" (×10ⁿ); chars.toml unicode is "10", not a glyph
+    ("\\sE;", 0x0F),        # scientific E ("10 to the power of"), no Unicode form
+    # Misc tab: CASIO-only glyphs (negative-video letters/signs, GRAPH bold
+    # letters, wide comma, serif r). Astral or no-Unicode, so tokenised here.
+    # NB: the negative-video tokens use an "nv" prefix, not "neg", because the
+    # LATEX pass (run before _encode_run) would rewrite the "\ne" in "\negB;" to ≠.
+    ("\\nvB;", 0xE5B5),     # negative-video B
+    ("\\nvR;", 0xE5A1),     # negative-video R
+    ("\\nvL;", 0xE5B7),     # negative-video L
+    ("\\nvEq;", 0xE5B8),    # negative-video =
+    ("\\nvLt;", 0xE5B9),    # negative-video <
+    ("\\nvGt;", 0xE5BA),    # negative-video >
+    ("\\nvLE;", 0xE5BB),    # negative-video <=
+    ("\\nvGE;", 0xE5BC),    # negative-video >=
+    ("\\boldP;", 0xE5B1),   # bold P (probability)
+    ("\\boldr;", 0xE5B2),   # bold r (regression)
+    ("\\boldX;", 0xE5B3),   # bold X (graph)
+    ("\\boldY;", 0xE5B4),   # bold Y (graph)
+    ("\\serifr;", 0xCD),    # serif r
+    ("\\lgComma;", 0xE5BD),  # wide comma
+    ("x̅", 0xC2),      # x̄  mean of x
+    ("y̅", 0xC3),      # ȳ  mean of y
+    ("x̂", 0xCB),      # x̂  estimated x
+    ("ŷ", 0xCC),      # ŷ  estimated y
+    ("p̂", 0x7FC7),    # p̂  estimated sample proportion
+    ("⁻¹", 0xE5CA),  # ⁻¹  Superscript Minus One (single glyph)
+    ("ŷ", 0xCC),      # ŷ precomposed (U+0177) -> same glyph as decomposed y+̂
+]
+
+def _push_code(out, code):
+    out += ([code >> 8, code & 0xFF] if code > 0xFF else [code])
+
 def _emit_char(ch, enc, out, literal_super):
     if ch in VULGAR:
         num, den = VULGAR[ch]
         _emit_fraction(num, den, enc, out, literal_super)
         return
     if ch in EACT_OVERRIDE:
-        code = EACT_OVERRIDE[ch]
-        out += ([code >> 8, code & 0xFF] if code > 0xFF else [code])
+        _push_code(out, EACT_OVERRIDE[ch])
         return
     if ch in SUPERS and literal_super:
         # explicit power form: Power + raised digit (calc-style a8 1a..1b)
@@ -220,10 +261,7 @@ def _emit_char(ch, enc, out, literal_super):
         code = enc[ch]
     else:
         raise ValueError(f"no CASIO mapping for U+{o:04X} {ch!r}")
-    if code > 0xFF:
-        out += [code >> 8, code & 0xFF]
-    else:
-        out.append(code)
+    _push_code(out, code)
 
 def _emit_subscript(text, out):
     """Subscript run: digit -> 0xE5(D0+d) glyph, letter -> 0xE7|ord (Mini Latin)."""
@@ -245,6 +283,11 @@ def _encode_run(text, enc, literal_super):
     i = 0
     n = len(text)
     while i < n:
+        raw = next(((seq, code) for seq, code in RAW_SEQ if text.startswith(seq, i)), None)
+        if raw is not None:
+            _push_code(out, raw[1])
+            i += len(raw[0])
+            continue
         if text.startswith(r"\frac{", i):
             num, j = _read_group(text, i + 5)
             if j >= n or text[j] != "{":
