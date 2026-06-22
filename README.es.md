@@ -1,7 +1,5 @@
 # eactgen — generador de eActivity para CASIO
 
-*[English version](README.md)*
-
 Genera archivos **eActivity** de CASIO (`.g2e` / `.g1e`) para las calculadoras gráficas
 de la serie fx-9860G directamente en tu computadora: escribe tus fórmulas en texto plano
 con un pequeño marcado tipo LaTeX y obtén un archivo listo para pasar a la calculadora.
