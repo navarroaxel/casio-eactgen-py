@@ -99,6 +99,11 @@ See [`AGENTS.md`](AGENTS.md) for the full reverse-engineered format: standard he
 checksums, the MCS directory, cell layout, and the complete markup→bytes mapping. The
 implementation is a single file, `casio_translate.py`.
 
+## See also
+
+- [casio-structural-programs](https://github.com/navarroaxel/casio-structural-programs) — fx-9860GIII
+  Basic programs for structural analysis exams, with a `.g1m` program-file writer (same standard header).
+
 ## Credits
 
 - Character table: the [Cahute](https://cahute.org) project (Thomas Touhey), CeCILL 2.1.
