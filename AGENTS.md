@@ -85,6 +85,19 @@ Cells (contiguous after directory + `00 00 00 00`):
 - The format spec also lives in the module docstrings and in the project memory
   (`eactmaker-recreation.md`).
 
+## Cross-checks from a sibling project
+
+[`casio-structural-programs`](https://github.com/navarroaxel/casio-structural-programs) writes **`.g1m`
+program files** (main memory, group `PROGRAM`) with its own TypeScript writer. What it confirms for this repo:
+
+- **Same standard header.** Its 32-byte header is the one described under "File format": byte `0x0E` =
+  `~(size+0x41)`, `0x0F` = `0xFE`, `0x10` = `~size` (u32), `0x14` = `0x147 − size`. There it was verified by
+  rebuilding four real `.g1m` files byte for byte, so the header is shared by `.g1m`, `.g1e` and `.g2e`;
+  only the group / directory that follows differs.
+- **Codes seen working on a real fx-9860GIII** (in program strings, same FONTCHARACTER codes as here):
+  superscript digits `⁰¹²³⁴⁵⁶⁷⁸⁹` = `E5C0`–`E5C9` and the "Mini Latin" subscript letters `ₐₘₓᵢₙ` = `E7` + ASCII
+  code (`E761`, `E76D`, `E778`, `E769`, `E76E`).
+
 ## Known limitations / next steps
 
 - `\note{title}{body}` (type `0x06`) is a nested eActivity container — unimplemented.
